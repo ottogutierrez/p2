@@ -31,8 +31,27 @@ def expand_hrp(add_type:str):
         temp_list.append(char_num & 31)
     return temp_list
     
-def polymod(data):
-    print('polymod function here')
+def bech32_polymod(values): # taken from https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki
+    GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
+    chk = 1
+    for v in values:
+        b = (chk >> 25)
+        chk = (chk & 0x1ffffff) << 5 ^ v
+        for i in range(5):
+            chk ^= GEN[i] if ((b >> i) & 1) else 0
+    return chk
+
+def bech32_create_checksum(hrp,data): # https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki
+    values = expand_hrp(hrp) + data
+    polymod = bech32_polymod(values + [0,0,0,0,0,0]) ^ 1
+    return [(polymod >> 5 * (5-i)) & 31 for i in range(6)]
+    
+def assemble_address(hrp,data,checksum):
+    temp_string = hrp+"1"
+    bech32_charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    for x in data+checksum:
+        temp_string += bech32_charset[x]
+    return temp_string
 
 while True:
     try:
@@ -52,12 +71,15 @@ temp_hash160 = hashlib.new('ripemd160',hashlib.sha256(enc_pub_key).digest())
 print(f"Hash160 (Witness Program): {temp_hash160.digest().hex()}")
 
 # Assembling the address
-bech32_bytes = to_5bit_groups(temp_hash160.digest())
+data = to_5bit_groups(temp_hash160.digest())
 #  insert version '0'
-bech32_bytes.insert(0,0)
+data.insert(0,0)
 # address type
-address_type = expand_hrp('tb')
-# hrp + address
-values = address_type + bech32_bytes
-print(polymod(values))
+hrp = 'tb'
+# check sum
+checksum = bech32_create_checksum(hrp,data)
+# final address
+address = assemble_address(hrp,data,checksum)
+print(address)
+
 
