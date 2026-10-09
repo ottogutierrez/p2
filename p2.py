@@ -53,6 +53,21 @@ def assemble_address(hrp,data,checksum):
         temp_string += bech32_charset[x]
     return temp_string
 
+def get_p2wpkh(pub_key,hrp):
+    # sha256 and ripemd160
+    temp_hash160 = hashlib.new('ripemd160',hashlib.sha256(pub_key).digest())
+    print(f"Hash160 (Witness Program): {temp_hash160.digest().hex()}")
+
+    # Assembling the address
+    data = to_5bit_groups(temp_hash160.digest())
+    #  insert version '0'
+    data.insert(0,0)
+    # check sum
+    checksum = bech32_create_checksum(hrp,data)
+    # final address
+    address = assemble_address(hrp,data,checksum)
+    return address
+
 while True:
     try:
         my_secret = secrets.token_bytes(32)
@@ -61,25 +76,12 @@ while True:
     except ECError:
         print('bad secret generated')
 
-print(f"PrivKey WIF: {pk.wif(NETWORKS['signet'])}")
+# print(f"PrivKey WIF: {pk.wif(NETWORKS['signet'])}")
 pub_key = pk.get_public_key()
 enc_pub_key = pub_key.sec()
 print(f"Public key: {enc_pub_key.hex()}")
+p2wpkh_string = get_p2wpkh(enc_pub_key,'tb')
 
-# sha256 and ripemd160
-temp_hash160 = hashlib.new('ripemd160',hashlib.sha256(enc_pub_key).digest())
-print(f"Hash160 (Witness Program): {temp_hash160.digest().hex()}")
-
-# Assembling the address
-data = to_5bit_groups(temp_hash160.digest())
-#  insert version '0'
-data.insert(0,0)
-# address type
-hrp = 'tb'
-# check sum
-checksum = bech32_create_checksum(hrp,data)
-# final address
-address = assemble_address(hrp,data,checksum)
-print(address)
+print(p2wpkh_string)
 
 
